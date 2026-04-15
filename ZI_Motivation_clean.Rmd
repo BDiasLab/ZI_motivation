@@ -1,0 +1,1425 @@
+---
+title: "Zona Incerta Regulation of Motivation - Dissertation Summary"
+author: "Laura Korobkova"
+date: '2025-11-02'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: cosmo
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+# Load all required libraries
+library(ggplot2)
+library(ggpattern)
+library(ggpubr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(grid)
+library(VennDiagram)
+library(kableExtra)
+library(lme4, lib.loc = "/Library/Frameworks/R.framework/Versions/4.1/Resources/library")
+
+# Define consistent color palette for the entire dissertation
+COLORS <- list(
+  # Treatment colors (blue-orange safe for colorblind)
+  vehicle = "#0072B2",      # Blue for vehicle
+  cno = "#E69F00",          # Orange for CNO
+
+  # Group colors
+  control = "#0072B2",      # Blue for controls
+  gi_dreadd = "#D55E00",    # Vermillion for GI (inhibitory DREADD)
+  gq_dreadd = "#009E73",    # Bluish green for GQ (excitatory DREADD)
+  gfp = "#999999",          # Gray for GFP controls
+
+  # Experiment-specific colors
+  rewarded = "#009E73",     # Bluish green for rewarded
+  no_reward = "#CC79A7",    # Reddish purple for non-rewarded
+  stress = "#F0E442",       # Yellow for stress conditions
+  fr1 = "#56B4E9",          # Sky blue
+
+  # Stimulation colors
+  no_stim = "#BFBFBF",       # Light gray                                       
+  light_stim = "#0072B2",                                                       
+  random_stim = "#404040",  # Dark gray for random stimulation
+
+  # Sex colors (avoiding red-green)
+  male = "#0072B2",         # Blue for males
+  female = "#CC79A7"        # Reddish purple for females
+)
+
+# Custom theme for all plots (publication-ready)
+theme_zi <- function() {                                                      
+    theme_classic() +                                                           
+      theme(                                                                    
+        text = element_text(size = 26, family = "Arial"),                       
+        plot.title = element_text(size = 18, face = "bold", hjust = 0.5),       
+        axis.title = element_text(size = 16, face = "bold"),
+        axis.text = element_text(size = 14),
+        axis.text.x = element_text(angle = 0, hjust = 1),
+        legend.position = "right",
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 16, face = "bold"),
+        legend.key.size = unit(1.2, "cm"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(size = 15, face = "bold"),
+        strip.background = element_rect(fill = "gray95", color = NA)
+      )
+  }
+
+# Define custom operator
+'%!in%' <- function(x,y)!('%in%'(x,y))
+```
+
+# 1. GI DREADD in ZI: Motivation Experiments
+
+## 1.1 Data Loading and Preprocessing
+
+```{r h8090-data-prep}
+# Load metadata and exclusion criteria
+meta <- read.csv("data/meta_gi.csv")
+excl <- read.csv("data/excluded_animals.csv")
+breakpoint <- read.csv("data/breakpoint_gi.csv")
+
+# Define comparison groups
+group_comp <- list(
+  c("cont_cno", "cont_veh"),
+  c("GI_veh", "GI_cno"),
+  c("cont_cno", "GI_cno"),
+  c("cont_veh", "GI_veh")
+)
+```
+
+
+#Progressive Ratio (PR) Test
+
+```{r pr-test-analysis}
+# Load and prepare PR data
+pr_h80h90 <- read.csv("data/pr_gi.csv")
+pr_h80h90 <- pr_h80h90[pr_h80h90$Animal %!in% excl$Animal,]
+pr_h80h90 <- pr_h80h90[pr_h80h90$Animal != "H92.3",]
+pr_h80h90 <- merge(pr_h80h90, breakpoint)
+pr_h80h90$groups <- paste(pr_h80h90$group, pr_h80h90$treatment, sep="_")
+pr_h80h90$groups <- factor(pr_h80h90$groups, levels = c("cont_veh", "cont_cno", "GI_veh", "GI_cno"))
+
+knitr::kable(
+  table(pr_h80h90[pr_h80h90$treatment=="cno",]$group,
+        pr_h80h90[pr_h80h90$treatment=="cno",]$sex),
+  caption = "Sample sizes by group and sex (CNO treatment)"
+)
+
+# Breakpoint analysis
+gi_pr = ggplot(pr_h80h90[pr_h80h90$cohort %in% c("h90", "h80"),],
+         aes(x = groups, y = breakingpoint)) +
+    geom_boxplot(aes(fill = treatment), alpha = 0.7, outlier.shape = NA) +
+    geom_boxplot_pattern(aes(pattern = group), alpha = 0.3) +
+    geom_jitter(aes(color = sex), width = 0.1, size = 2.5, alpha = 0.8) +
+    labs(
+      title = "Progressive Ratio: GI DREADD Effect on Motivation",
+      x = "Group and Treatment",
+      y = "Breakpoint"
+    ) +
+    scale_fill_manual(
+      name = "Treatment",
+      values = c("cno" = COLORS$cno, "veh" = COLORS$vehicle)
+    ) +
+    scale_color_manual(
+      name = "Sex",
+      values = c("male" = COLORS$male, "female" = COLORS$female)
+    ) +
+    stat_compare_means(
+      method = "wilcox.test",
+      paired = FALSE,
+      comparisons = group_comp,
+      label = "p.signif",
+      size = 7
+    ) + theme(axis.text.x = element_text(face="bold", angle=0))+ theme_zi()
+
+ggsave("/Users/laura/Desktop/GRADSCHOOL/DIAS/manuscripts_grants/ZI_MANUSCRIPT/FIGURES/R_gi_pr.pdf", plot = gi_pr, width = 11.5, 
+       height=7.5,  units = "in", device = cairo_pdf, dpi = 300)
+
+wilcox.test(pr_h80h90[pr_h80h90$cohort %in% c("h90", "h80") & pr_h80h90$groups=="GI_veh",]$breakingpoint, pr_h80h90[pr_h80h90$cohort %in% c("h90", "h80") & pr_h80h90$groups=="GI_cno",]$breakingpoint)
+
+table(pr_h80h90[pr_h80h90$cohort %!in% c("zi-vp") & pr_h80h90$treatment=="veh",]$sex,pr_h80h90[pr_h80h90$cohort %!in% c("zi-vp") & pr_h80h90$treatment=="veh",]$group )
+
+# Press rate analysis
+ggplot(pr_h80h90, aes(x = groups, y = breakingpoint))  +
+    geom_boxplot(aes(fill = treatment), alpha = 0.7, outlier.shape = NA) +
+    geom_boxplot_pattern(aes(pattern = group), alpha = 0.3) +
+    geom_jitter(width = 0.1, color = "black", size = 2.5, alpha = 0.6) +
+    labs(
+        title = "Progressive Ratio: GI DREADD vs GFP Control",
+        x = "Group and Treatment",
+        y = "Breakpoint"
+    ) +
+    scale_fill_manual(
+        name = "Treatment",
+        values = c("cno" = COLORS$cno, "veh" = COLORS$vehicle)
+    ) +
+    stat_compare_means(
+        method = "wilcox.test",
+        paired = FALSE,
+        comparisons = group_comp,
+        label = "p.signif",
+        size = 5
+    ) +
+    theme_zi()
+
+##ANOVA used in the paper 
+model_gi_pr <- lmer(breakingpoint ~ treatment * group * sex + (1 | Animal), data =pr_h80h90)
+anova(model_gi_pr)
+
+
+# Statistical analysis
+pr_anova <- aov(breakingpoint ~ treatment*group * sex , data = pr_h80h90[pr_h80h90$cohort %!in% c("zi-vp"),])
+summary(pr_anova)
+
+data_sub <- pr_h80h90[pr_h80h90$cohort %!in% c("zi-vp"), ]
+
+library(effsize)
+
+cont <- pr_h80h90[pr_h80h90$cohort %in% c("h90", "h80") & pr_h80h90$groups ==
+  "cont_veh", ]$breakingpoint
+  gi <- pr_h80h90[pr_h80h90$cohort %in% c("h90", "h80") & pr_h80h90$groups ==
+  "GI_cno", ]$breakingpoint
+  
+  cohen.d(cont, gi)
+  
+```
+
+**Key Finding:** Progressive ratio test indicates decreased motivation when ZI is inhibited `
+
+#Open Field Test (Inhibition)
+
+```{r open-field-analysis}
+# Load and prepare open field data
+open_field_h80h90 <- read.csv("data/open_field_gi.csv")
+open_field_h80h90 <- open_field_h80h90[open_field_h80h90$Animal %!in% excl$Animal,]
+open_field_h80h90 <- open_field_h80h90[open_field_h80h90$Animal != "H92.3",]
+open_field_h80h90 <- merge(open_field_h80h90, meta)
+open_field_h80h90$groups <- paste(open_field_h80h90$group, open_field_h80h90$treatment, sep="_")
+open_field_h80h90$groups <- factor(open_field_h80h90$groups, levels = c("cont_veh", "cont_cno", "GI_veh", "GI_cno"))
+
+table(open_field_h80h90$groups, open_field_h80h90$sex)
+
+anova_open_gi = aov(Distance~ group*treatment*sex, data = open_field_h80h90[open_field_h80h90$excl!="excl" & open_field_h80h90$Distance<15000,])
+summary(anova_open_gi)
+
+ggplot(open_field_h80h90[open_field_h80h90$excl!="excl" & open_field_h80h90$Distance<15000,], aes(x = groups, y = Distance)) +
+    geom_boxplot(aes(fill = treatment), alpha = 0.7, outlier.shape = NA) +
+    geom_boxplot_pattern(aes(pattern = group), alpha = 0.3) +
+    labs(
+        title = "Open Field: Inhibitory DREADD Effect on Locomotion",
+        x = "Group and Treatment",
+        y = "Distance Traveled (cm)"
+    ) +
+    scale_fill_manual(
+        name = "Treatment",
+        values = c("cno" = COLORS$cno, "veh" = COLORS$vehicle)
+    ) +
+    stat_compare_means(
+        method = "wilcox.test",
+        paired = FALSE,
+        comparisons = group_comp,
+        label = "p.signif",
+        size = 7
+    ) +
+    theme_zi() #+
+geom_jitter(width = 0.1, color = "black", size = 2.5, alpha = 0.6) 
+
+
+# By group faceted plot
+open_field_h80h90$treatment = factor(open_field_h80h90$treatment, level = c("veh", "cno"))
+ggplot(open_field_h80h90, aes(x = treatment, y = Distance)) +
+  geom_boxplot(aes(fill = treatment), alpha = 0.7, outlier.shape = NA) +
+  geom_jitter(width = 0.1, color = "black", size = 2.5, alpha = 0.6) +
+  labs(
+    title = "Open Field: Distance by Group",
+    x = "Treatment",
+    y = "Distance Traveled (cm)"
+  ) +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c("cno" = COLORS$cno, "veh" = COLORS$vehicle)
+  ) +
+  stat_compare_means(
+    method = "wilcox.test",
+    paired = FALSE,
+    label = "p.signif",
+    size = 7
+  ) +
+  facet_wrap(~group) +
+  theme_zi()
+```
+**Key Finding:** Open field test shows that the ZI inhibition doesn't effect the locomotion.
+
+##Memory Test 
+
+```{r memory-test-analysis}
+# Load and prepare memory test data
+h90_memory <- read.csv("data/prob_memory_gi.csv")
+meta_h90 <- read.csv("data/meta_gi_memory.csv")
+h90_memory <- merge(h90_memory, meta_h90)
+h90_memory$treatment <- factor(h90_memory$treatment, levels = c("veh", "cno"))
+
+h90_memory$group_treat = paste(h90_memory$group, "_", h90_memory$treatment)
+
+h90_memory$group_treat = factor(h90_memory$group_treat, levels = c("cont _ veh", "cont _ cno", "GI _ veh", "GI _ cno"))
+comp_mem = list(
+  c("cont _ veh", "cont _ cno"),
+  c("cont _ veh", "GI _ veh"),
+  c("cont _ cno", "GI _ veh"),
+  c("GI _ veh", "GI _ cno")
+)
+  
+  
+# Memory test plot
+memory_h90_plot = ggplot(h90_memory, aes(x = group_treat, y = lev1_over_lev2)) +
+  geom_boxplot(aes(fill = treatment), alpha = 0.7, outlier.shape = NA) +
+  labs(
+    title = "No effect of GABAergic ZI inhibiton on Memory",
+    x = "Treatment",
+    y = "Correct Lever Index"
+  ) +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c("cno" = COLORS$cno, "veh" = COLORS$vehicle)
+  ) +
+  stat_compare_means(
+    method = "wilcox.test",
+    paired = FALSE,
+    label = "p.signif",
+    size = 7, comparison = comp_mem
+  ) + geom_boxplot_pattern(aes(pattern = group), alpha = 0.3) +theme_zi() # geom_jitter(width = 0.1, color = "black", size = 2.5, alpha = 0.6) 
+
+ggsave("/Users/laura/Desktop/GRADSCHOOL/DIAS/manuscripts_grants/ZI_MANUSCRIPT/FIGURES/R_gi_memory.pdf", plot = memory_h90_plot, width = 11.5, 
+       height=7.5,  units = "in", device = cairo_pdf, dpi = 300)
+
+
+
+gi_memory_anova = aov(lev1_over_lev2 ~ treatment*group, data = h90_memory)
+summary(gi_memory_anova)
+```
+
+**Key Finding:** ZI inhibition doesn't affect memory.
+
+---
+
+# 2. GQ DREADD in ZI: Excitatory Manipulation
+
+## GQ DREADD Progressive Ratio
+
+```{r gq-pr-analysis}
+
+hcohorts_gq_pr = read.csv("data/pr_gq.csv")
+
+hcohorts_gq_pr = merge(hcohorts_gq_pr, breakpoint)
+
+hcohorts_gq_pr$group_treat <- factor(hcohorts_gq_pr$group_treat,
+  levels = c("cont_veh", "cont_cno", "GQ_veh", "GQ_cno"))
+
+group_comp_gq_cont <- list(
+  c("cont_veh", "cont_cno"),
+  c("cont_veh", "GQ_veh"),
+  c("GQ_veh", "GQ_cno"),
+  c("cont_veh", "GQ_cno"), c("cont_cno", "GQ_cno")
+)
+
+# GQ PR plot
+gq_pr = ggplot(hcohorts_gq_pr, aes(x = group_treat, y = breakingpoint)) +
+  geom_boxplot(aes(fill = treatment), alpha = 0.7, outlier.shape = NA) +
+  geom_boxplot_pattern(aes(pattern = group), alpha = 0.3) +geom_jitter(aes(color = sex), width = 0.1, size = 2.5, alpha = 0.8) +
+    labs(
+        title = "Progressive Ratio: GQ DREADD Effect on Motivation",
+        x = "Group and Treatment",
+        y = "Breakpoint"
+    ) +
+    scale_fill_manual(
+        name = "Treatment",
+        values = c("cno" = COLORS$cno, "veh" = COLORS$vehicle)
+    ) +
+    scale_color_manual(
+        name = "Sex",
+        values = c("male" = COLORS$male, "fem" = COLORS$fem)
+    ) +
+    stat_compare_means(
+        method = "wilcox.test",
+        paired = FALSE,
+        comparisons = group_comp_gq_cont,
+        label = "p.signif",
+        size = 7
+    ) +
+    theme_zi()
+
+ggsave("/Users/laura/Desktop/GRADSCHOOL/DIAS/manuscripts_grants/ZI_MANUSCRIPT/FIGURES/R_gq_pr_final.pdf", plot = gq_pr, width = 11.5, 
+       height=7.5,  units = "in", device = cairo_pdf, dpi = 300)
+
+
+gq_pr_anova = aov(breakingpoint~group*treatment*sex, data = hcohorts_gq_pr)
+summary(gq_pr_anova)
+
+##USED in paper
+model_gq <- lmer(breakingpoint ~ treatment * group*sex + (1 | animal), data = hcohorts_gq_pr)
+anova(model_gq)
+
+table(hcohorts_gq_pr[hcohorts_gq_pr$treat == "veh", ]$group, hcohorts_gq_pr[hcohorts_gq_pr$treat == "veh", ]$sex)
+
+wilcox.test(hcohorts_gq_pr[hcohorts_gq_pr$group_treat=="GQ_veh",]$breakingpoint, hcohorts_gq_pr[hcohorts_gq_pr$group_treat=="GQ_cno",]$breakingpoint, paired=FALSE)
+
+cont <- hcohorts_gq_pr[hcohorts_gq_pr$treatment=="cno" & hcohorts_gq_pr$group=="hm3dgq",]$breakingpoint
+
+gq <- hcohorts_gq_pr[hcohorts_gq_pr$treatment=="veh" & hcohorts_gq_pr$group=="hm3dgq",]$breakingpoint
+
+library(effsize) 
+
+cohen.d(cont, gq)
+
+```
+
+
+## GQ Probe Test
+
+```{r gq-probe-test}
+# Load GQ probe test data
+h_gq_prob_test <- read.csv("data/prob_test_gq.csv")
+h_meta <- read.csv("data/meta_gq_gi.csv")
+h_gq_prob_test <- merge(h_gq_prob_test, h_meta)
+
+# GQ probe plot with individual trajectories
+ggplot(
+  h_gq_prob_test[h_gq_prob_test$animal %!in% c("18.2", "H112.2") &
+                 h_gq_prob_test$cort != "cort",],
+  aes(x = treatment, y = lever_pressed)
+) +
+  geom_boxplot(aes(fill = treatment), alpha = 0.7, outlier.shape = NA) +
+  geom_jitter(width = 0.1, size = 2.5, alpha = 0.6) +
+  geom_line(aes(group = animal), alpha = 0.3) +
+  labs(
+    title = "GQ DREADD Probe Test: Lever Pressing Across Days",
+    x = "Treatment",
+    y = "Lever Presses"
+  ) +
+  scale_fill_manual(
+    name = "Treatment",
+    values = c("cno" = COLORS$cno, "veh" = COLORS$vehicle)
+  ) +
+  scale_color_manual(
+    name = "Sex",
+    values = c("male" = COLORS$male, "female" = COLORS$female)
+  ) +
+  stat_compare_means(
+    method = "wilcox.test",
+    paired = TRUE,
+    label = "p.signif",
+    size = 7
+  ) +
+  facet_wrap(~group * day) +
+  theme_zi()
+```
+
+
+
+## 3. Fiber photomtery. Reward Discrimination Learning
+
+```{r fiber-reward-discrimination}
+
+# raw files /Users/laura/Downloads/zi-opto-fiber/mixed_fiber/TH-vGAT/rewarded_non_rewarded_lights
+# png /Users/laura/Downloads/zi-opto-fiber/fiber_photometry_output
+#python 
+# Load reward/light discrimination data
+light_reward_picked = read.csv("data/opto_light_rewarded.csv")
+
+light_reward_picked$training = factor(light_reward_picked$training, levels = c("before", "after"))
+
+
+#  reward discrimination
+ggplot(light_reward_picked,aes(x = signal, y = as.numeric(auc))
+) +
+    geom_boxplot(aes(fill = signal), size = 0.8, alpha = 0.5) +
+    geom_line(aes(group = filename), size = 0.5, alpha = 0.9) +
+    geom_point(size = 3) +
+    labs(
+        title = "ZI Discriminates Rewarded Light After Training",
+        x = "Light Type",
+        y = "A.U.C"
+    ) +
+    scale_fill_manual(
+        name = "Light",
+        values = c("non_rewarded" = COLORS$no_reward, "rewarded" = COLORS$rewarded)
+    ) +
+    scale_color_manual(
+        name = "Light",
+        values = c("non_rewarded" = COLORS$no_reward, "rewarded" = COLORS$rewarded)
+    ) +
+    stat_compare_means(
+        method = "wilcox.test",
+        paired = TRUE,
+        size = 6, label = "p.signif"
+    ) +
+    facet_wrap(~training) +
+    theme_zi()
+
+## too match python hist 
+r_rewarded_light = ggplot(light_reward_picked,aes(x = signal, y = as.numeric(auc))
+) +
+    geom_boxplot(aes(fill = signal), size = 0.8, alpha = 0.8) +
+    geom_line(aes(group = filename), size = 0.5, alpha = 0.3) +
+    geom_point(size = 2) +
+    labs(
+        #title = "ZI Discriminates Rewarded Light After Training",
+        #x = "Light Type",
+        y = "A.U.C"
+    ) +
+    scale_fill_manual(
+        name = "Light",
+        values = c("non_rewarded" =	"#FFC896", "rewarded" = "#BBD6E8")
+    ) +
+    scale_color_manual(
+        name = "Light",
+        values = c("non_rewarded" =	"#FFC896", "rewarded" = "#BBD6E8")
+    ) +
+    stat_compare_means(
+        method = "wilcox.test",
+        paired = TRUE,
+        size = 6, label = "p.signif"
+    ) +
+    facet_wrap(~training) +
+    theme_zi()
+
+ggsave("/Users/laura/Desktop/GRADSCHOOL/DIAS/manuscripts_grants/ZI_MANUSCRIPT/FIGURES/r_rewarded_light.pdf", plot = r_rewarded_light, width = 10.5, 
+       height=6.5,  units = "in", device = cairo_pdf, dpi = 300)
+
+
+wilcox.test(light_reward_picked[light_reward_picked$signal=="rewarded" & light_reward_picked$training=="before",]$auc,light_reward_picked[light_reward_picked$signal=="non_rewarded" & light_reward_picked$training=="before",]$auc)
+
+wilcox.test(light_reward_picked[light_reward_picked$signal=="rewarded" & light_reward_picked$training=="after",]$auc,light_reward_picked[light_reward_picked$signal=="non_rewarded" & light_reward_picked$training=="after",]$auc)
+
+reward <- light_reward_picked[light_reward_picked$signal=="rewarded" & light_reward_picked$training=="after",]$auc
+
+non_reward <- light_reward_picked[light_reward_picked$signal=="non_rewarded" & light_reward_picked$training=="after",]$auc
+
+
+cohen.d(reward, non_reward)
+
+
+anova_lights <- aov(
+  auc ~ signal*training*sex,
+  data = light_reward_picked)
+
+summary(anova_lights)
+
+#sample size
+table(light_reward_picked[light_reward_picked$training=="before" & light_reward_picked$signal=="rewarded",]$sex)
+
+
+### training progress on light 
+light_rewarded_not_training = read.csv("data/opto_training_progress.csv")
+
+light_rewarded_not_training = light_rewarded_not_training %>% dplyr::group_by(Subject, Day) %>%
+        dplyr::summarise(IRT_light_active = mean(IRT_light_active), IRT_light_passive = mean(IRT_light_passive))
+
+
+light_rewarded_not_training_long <- light_rewarded_not_training %>%                  pivot_longer(
+      cols = c(IRT_light_active, IRT_light_passive),                            
+      names_to = "light",
+      values_to = "IRT"
+    ) %>%
+    mutate(
+      light = case_when(
+        light == "IRT_light_active" ~ "rewarded",
+        light == "IRT_light_passive" ~ "non-rewarded"
+      )
+    )
+ 
+
+library(lmerTest)  
+
+model <- lmer(IRT ~ light * Day + (1 | Subject), data =
+                  light_rewarded_not_training_long)
+results <- anova(model)                                                     
+                                                                                
+  # Get interaction p-value                                                     
+  p_interaction <- results["light:Day", "Pr(>F)"]                               
+
+  # Format as stars
+  p_star <- ifelse(p_interaction < 0.001, "***",
+            ifelse(p_interaction < 0.01, "**",
+            ifelse(p_interaction < 0.05, "*", "ns")))
+  
+  
+fiber_training_r = ggplot(light_rewarded_not_training_long[light_rewarded_not_training_long$Day<15 & light_rewarded_not_training_long$Subject %!in% c("th1.1", "th1.2", "th1.3", "h64.1", "h64.3"),],
+       aes(x = Day, y = IRT, color = light)) +
+    # mean points per group
+    stat_summary(aes(group = light),
+                 fun = mean,
+                 geom = "point",
+                 size = 2) +
+    # mean ± SE per group
+    stat_summary(aes(group = light),
+                 fun.data = mean_se,
+                 geom = "errorbar",
+                 width = 0.3) +
+    # mean line per group
+    stat_summary(aes(group = light),
+                 fun = mean,
+                 geom = "line",
+                 size = 1.2) +
+    labs(
+        title = "Training progress",
+        x = "Training day",
+        y = "IRT: light - detector, sec"
+    ) +
+    theme_zi() +
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+    scale_color_manual(
+        name = "Light",
+        values = c("non-rewarded" =	"#FFC896", "rewarded" = "#BBD6E8")
+    )+    annotate("text",
+             x = 7, y = 27,
+             label = paste0("light × day: ", p_star),
+             size = 5)
+
+
+ggsave("/Users/laura/Desktop/GRADSCHOOL/DIAS/manuscripts_grants/ZI_MANUSCRIPT/FIGURES/R_fiber_training.pdf", plot = fiber_training_r, width = 9.5, 
+       height=5.5,  units = "in", device = cairo_pdf, dpi = 300)
+
+
+```
+
+
+---
+
+# Optogenetics: Direct ZI Manipulation
+
+## Optogenetic Stimulation During PR
+
+```{r opto-pr-analysis}
+# Load optogenetic PR data
+all_opto_pr <- read.csv("data/pr_opto.csv")
+all_opto_pr$stim <- factor(
+  all_opto_pr$stim,
+  levels = c("no_stim", "light_stim", "random_stim")
+)
+
+stim_comp <- list(
+  c("no_stim", "light_stim"),
+  c("no_stim", "random_stim"),
+  c("light_stim", "random_stim")
+)
+
+day_comp<- list(
+  c("d1", "d2"),
+  c("d1", "d3"),
+  c("d2", "d3")
+)
+
+
+all_opto_pr$stim = factor(all_opto_pr$stim, levels = c("no_stim", "random_stim", "light_stim"))
+
+# Main optogenetic PR plot by sex
+r_opto_pr = ggplot(
+  all_opto_pr[all_opto_pr$animal %!in% c("h56.2", "h168.1") &
+              all_opto_pr$freq == "20hz" &
+              all_opto_pr$stim %in% c("light_stim", "random_stim", "no_stim"),],
+  aes(x = stim, y = lev_press)
+) +
+  geom_boxplot(aes(fill = stim), alpha = 0.7, outlier.shape = NA) +
+  geom_jitter(width = 0.1, color = "black", size = 1.5, alpha = 0.6) +
+  geom_line(aes(group = animal), alpha = 0.3) +
+  labs(
+    #title = "Optogenetic Stimulation During # PR: Sex Differences",
+    x = "Stimulation Condition",
+    y = "Lever Presses"
+  ) +
+  scale_fill_manual(
+    name = "Stimulation",
+    values = c(
+      "no_stim" = COLORS$no_stim,
+      "light_stim" = COLORS$light_stim,
+      "random_stim" = COLORS$random_stim
+    )
+  ) +
+  stat_compare_means(
+    method = "wilcox.test",
+    paired = TRUE,
+    comparisons = stim_comp,
+    label = "p.signif",
+    size = 7
+  ) +
+  facet_wrap(~sex) +
+  theme_zi()
+
+
+ggsave("/Users/laura/Desktop/GRADSCHOOL/DIAS/manuscripts_grants/ZI_MANUSCRIPT/FIGURES/r_opto_pr.pdf", plot = r_opto_pr, width = 11.5, 
+       height=5.5,  units = "in", device = cairo_pdf, dpi = 300)
+
+
+# Main optogenetic PR plot by sex by day
+r_opto_pr_days = ggplot(
+  all_opto_pr[all_opto_pr$animal %!in% c("h56.2", "h168.1") &
+              all_opto_pr$freq == "20hz" &
+              all_opto_pr$stim %in% c("light_stim", "random_stim", "no_stim"),],
+  aes(x = day, y = lev_press)
+) +
+  geom_boxplot(aes(fill = day), alpha = 0.7, outlier.shape = NA) +
+  geom_jitter(width = 0.1, color = "black", size = 2.5, alpha = 0.6) +
+  geom_line(aes(group = animal), alpha = 0.3) +
+  labs(
+    title = "Optogenetic Stimulation During PR: Sex Differences",
+    x = "Day",
+    y = "Lever Presses"
+  ) +
+  scale_fill_manual(
+    name = "Stimulation",
+    values = c(
+      "no_stim" = COLORS$no_stim,
+      "light_stim" = COLORS$light_stim,
+      "random_stim" = COLORS$random_stim
+    )
+  ) +
+  stat_compare_means(
+    method = "wilcox.test",
+    paired = TRUE,
+    comparisons = day_comp,
+    label = "p.signif",
+    size = 7
+  ) +
+  facet_wrap(~sex) +
+  theme_zi()
+
+
+ggsave("/Users/laura/Desktop/GRADSCHOOL/DIAS/manuscripts_grants/ZI_MANUSCRIPT/FIGURES/r_opto_pr_days.pdf", plot = r_opto_pr_days, width = 11.5, 
+       height=5.5,  units = "in", device = cairo_pdf, dpi = 300)
+
+wilcox.test(all_opto_pr[all_opto_pr$animal %!in% c("h56.2", "h168.1") &
+                     all_opto_pr$freq == "20hz" &  all_opto_pr$sex=="fem" & all_opto_pr$stim=="no_stim",]$lev_press, all_opto_pr[all_opto_pr$animal %!in% c("h56.2", "h168.1") &
+                     all_opto_pr$freq == "20hz" &  all_opto_pr$sex=="fem" & all_opto_pr$stim=="light_stim",]$lev_press, paired=TRUE)
+
+wilcox.test(all_opto_pr[all_opto_pr$animal %!in% c("h56.2", "h168.1") &
+                            all_opto_pr$freq == "20hz" &  all_opto_pr$sex=="male" & all_opto_pr$stim=="light_stim",]$lev_press, all_opto_pr[all_opto_pr$animal %!in% c("h56.2", "h168.1") &
+                                                                                                                                            all_opto_pr$freq == "20hz" &  all_opto_pr$sex=="male" & all_opto_pr$stim=="no_stim",]$lev_press, paired=TRUE)
+
+
+opto_anova = aov(lev_press~sex:stim, data = all_opto_pr[all_opto_pr$animal %!in% c("h56.2", "h168.1") & all_opto_pr$freq == "20hz",])
+
+summary(opto_anova)
+
+```
+
+## 5.2 Training Progress Before Optogenetic Testing
+
+```{r opto-training-progress}
+# Load training data
+all_opto_training_sum <- read.csv("data/opto_training.csv")
+all_opto_meta <- read.csv("data/opto_meta.csv")
+all_opto_training_sum <- merge(all_opto_training_sum, all_opto_meta)
+
+
+library(lme4)                               
+  library(lmerTest)                       
+                                              
+  model <- lmer(pressing_rate ~ sex * day + (1 | animal),                       
+                data = all_opto_training_sum[all_opto_training_sum$excl ==
+  "incl", ])                                                                    
+  results <- anova(model)
+                                                                                
+  # Format interaction p-value                                                  
+  p_int <- results["sex:day", "Pr(>F)"]
+  p_star <- ifelse(p_int < 0.001, "***",
+            ifelse(p_int < 0.01, "**",
+            ifelse(p_int < 0.05, "*", "ns")))
+  
+  
+# Press rate across training by sex
+ggplot(all_opto_training_sum[all_opto_training_sum$excl == "incl",],
+  aes(x = day, y = pressing_rate, color = sex)) +
+  stat_summary(fun = "mean", geom = "line", aes(group = sex), size = 1.2) +
+  stat_summary(fun = "mean", geom = "point", size = 2) +
+  stat_summary(fun.data = "mean_se", geom = "errorbar", width = 0.3) +
+  labs(
+    title = "Training Progress: Press Rate by Sex",
+    x = "Training Day",
+    y = "Press Rate (presses/min)"
+  ) +
+  scale_color_manual(
+    name = "sex",
+    values = c("male" = COLORS$male, "female" = COLORS$female)) +
+  theme_zi()+annotate("text", x = 3, y = Inf,
+             label = paste0("sex × day: ", p_star),
+             vjust = 1.5, size = 4)
+
+#average pressing across sexes
+
+library(rstatix, lib.loc = "/Library/Frameworks/R.framework/Versions/4.1/Resources/library")
+
+stat_overall <- all_opto_training_sum %>%
+    filter(excl == "incl") %>%
+    dplyr::group_by(sex, animal, state) %>%
+    dplyr::summarise(mean_rate = mean(pressing_rate, na.rm = TRUE)) %>%
+    dplyr::group_by(sex) %>%
+    wilcox_test(mean_rate ~ state, paired = TRUE) %>% add_significance()
+
+stat_labels <- stat_overall %>%
+    mutate(  x = 4,    y = Inf,label = paste0(p.signif))  
+
+ggplot(data = all_opto_training_sum[all_opto_training_sum$excl=="incl",], aes(x = day, y = pressing_rate, color = state)) +
+    stat_summary(fun = "mean", geom = "line", aes(group=as.factor(state)), size = 1) +
+    stat_summary(fun = "mean", geom = "point",
+                 size = 1) +
+    stat_summary(fun.data = "mean_se",
+                 geom = "errorbar",
+                 width = 0.3) +labs(title = "", x="day", y = "pressing rate", color = "training block") + theme(text = element_text(size = 14), axis.text.x = element_text(face="bold", angle=45))+scale_color_manual(values = c("brown", "black"), labels = c("light on, lever active", "light off, lever not active"))+
+  theme_zi()+facet_wrap(.~sex)+
+    geom_text(data = stat_labels,
+              aes(x = x, y = y, label = label),
+              vjust = 1.5, size = 4,
+              inherit.aes = FALSE)
+
+```
+
+## 5.3 Inter-Response Time (IRT) Analysis
+
+```{r opto-irt-analysis}
+# Load IRT data
+all_cohorts_irt_sum_filt2 <- read.csv("data/opto_irt.csv")
+opto_meta <- read.csv("data/opto_meta.csv")
+all_cohorts_irt_sum_filt2 <- merge(all_cohorts_irt_sum_filt2, opto_meta)
+#success rate 
+
+opto_success <- read.csv("data/opto_success.csv")
+opto_success = merge(opto_success, opto_meta)
+
+ggplot(
+  opto_success,
+  aes(x = day, y = succes_rate)
+) +
+  stat_summary(
+    fun = "mean",
+    geom = "line",
+    aes(group = sex, color = sex),
+    size = 1.2
+  ) +
+  stat_summary(
+    fun = "mean",
+    geom = "point",
+    aes(color = sex),
+    size = 2
+  ) +
+  stat_summary(
+    fun.data = "mean_se",
+    geom = "errorbar",
+    aes(color = sex),
+    width = 0.3
+  ) +
+  labs(
+    title = "Succcess Rate During Light Press Training",
+    x = "Training Day",
+    y = "rate"
+  ) +
+  scale_color_manual(
+    name = "Sex",
+    values = c("male" = COLORS$male, "female" = COLORS$female)
+  ) +
+  theme_zi()
+
+model_success <- lmer(succes_rate ~ sex * day + (1 | animal), data =
+  opto_success)                           
+  results_success <- anova(model_success)
+    
+  results_success
+  
+  p_int <- results_success["sex:day", "Pr(>F)"]
+  p_star <- ifelse(p_int < 0.001, "***",                                        
+            ifelse(p_int < 0.01, "**",
+            ifelse(p_int < 0.05, "*", "ns")))
+
+  
+
+# IRT across training by sex
+ggplot(
+  all_cohorts_irt_sum_filt2[all_cohorts_irt_sum_filt2$incl == "incl",],
+  aes(x = day, y = irt)
+) +
+  stat_summary(
+    fun = "mean",
+    geom = "line",
+    aes(group = sex, color = sex),
+    size = 1.2
+  ) +
+  stat_summary(
+    fun = "mean",
+    geom = "point",
+    aes(color = sex),
+    size = 2
+  ) +
+  stat_summary(
+    fun.data = "mean_se",
+    geom = "errorbar",
+    aes(color = sex),
+    width = 0.3
+  ) +
+  labs(
+    title = "Inter-Response Time During Light Press Training",
+    x = "Training Day",
+    y = "IRT (s)"
+  ) +
+  scale_color_manual(
+    name = "Sex",
+    values = c("male" = COLORS$male, "female" = COLORS$female)
+  ) +
+  theme_zi()
+
+##showing the difference in training 
+
+library(tidyverse)
+library(broom)
+
+# Calculate means and differences with statistics
+irt_stats <- all_cohorts_irt_sum_filt2 %>%
+  dplyr::filter(incl == "incl") %>%
+  dplyr::group_by(day) %>%
+  tidyr::nest() %>%
+  dplyr::mutate(
+    # Calculate means by sex
+    means = purrr::map(data, ~{
+      .x %>%
+        dplyr::group_by(sex) %>%
+        dplyr::summarise(
+          mean_irt = mean(irt, na.rm = TRUE),
+          se_irt = sd(irt, na.rm = TRUE) / sqrt(n()),
+          .groups = "drop"
+        )
+    }),
+    # Perform t-test
+    t_test = purrr::map(data, ~{
+      if(length(unique(.x$sex)) == 2) {
+        t.test(irt ~ sex, data = .x) %>% broom::tidy()
+      } else {
+        tibble(p.value = NA, statistic = NA)
+      }
+    })
+  ) %>%
+  tidyr::unnest(c(means, t_test)) %>%
+  tidyr::pivot_wider(
+    names_from = sex,
+    values_from = c(mean_irt, se_irt)
+  ) %>%
+  dplyr::mutate(
+    diff = mean_irt_male - mean_irt_female,
+    diff_se = sqrt(se_irt_male^2 + se_irt_female^2),
+    significant = p.value < 0.05
+  )
+
+# Plot with statistical annotations
+ggplot(irt_stats, aes(x = day, y = diff)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", size = 0.8) +
+  geom_line(size = 1.2, color = "black") +
+  geom_point(
+    aes(shape = significant, fill = significant),
+    size = 3,
+    color = "black"
+  ) +
+  geom_errorbar(
+    aes(ymin = diff - diff_se, ymax = diff + diff_se),
+    width = 0.3
+  ) +
+  scale_shape_manual(
+    name = "p < 0.05",
+    values = c("TRUE" = 21, "FALSE" = 21)
+  ) +
+  scale_fill_manual(
+    name = "p < 0.05",
+    values = c("TRUE" = "black", "FALSE" = "white")
+  ) +
+  labs(
+    title = "Sex Difference in IRT During Training",
+    subtitle = "Male - Female",
+    x = "Training Day",
+    y = "IRT Difference (s)"
+  ) +
+  theme_zi()
+
+# Print summary statistics table
+irt_stats %>%
+  dplyr::select(day, diff, diff_se, statistic, p.value) %>%
+  dplyr::mutate(
+    p.value = format.pval(p.value, digits = 3),
+    dplyr::across(c(diff, diff_se, statistic), ~round(.x, 3))
+  ) %>%
+  print()
+
+
+```
+
+**Key Finding:** Optogenetic results reveal causal relationship between sensory stimuli and motivational drive 
+
+---
+
+# 6. Food Consumption (GI DREADD)
+
+```{r food-consumption-analysis}
+# Load food consumption data
+h172h175_pellets <- read.csv("data/pit_pellets_probe.csv")
+pit_gi_meta <- read.csv("data/pit_meta_gi.csv")
+h172h175_pellets <- merge(h172h175_pellets, pit_gi_meta)
+
+table(pit_gi_meta$sex, pit_gi_meta$group)
+
+h172h175_pellets$food_restriction <- factor(
+  h172h175_pellets$food_restriction,
+  levels = c("long", "acute")
+)
+
+table(h172h175_pellets[h172h175_pellets$food_restriction=="long",]$sex, h172h175_pellets[h172h175_pellets$food_restriction=="long",]$virus)
+
+# Food consumption plot
+ggplot(h172h175_pellets[h172h175_pellets$food_restriction=="long",], aes(x = virus, y = as.numeric(pellets))) +
+  geom_boxplot(aes(fill = virus), size = 1, alpha = 0.5, outlier.shape = NA) +
+  geom_point(size = 3) +
+  labs(
+    title = "Food Consumption: GI DREADD with CNO",
+    x = "Group",
+    y = "Pellets Consumed"
+  ) +
+  scale_fill_manual(
+    name = "Virus",
+    values = c("gi" = COLORS$gi_dreadd, "gfp" = COLORS$gfp)
+  ) +
+  scale_color_manual(
+    name = "Sex",
+    values = c("male" = COLORS$male, "female" = COLORS$female)
+  ) +
+  stat_compare_means(
+    method = "wilcox.test",
+    paired = FALSE,
+    size = 7,
+    label = "p.format"
+  ) +
+  theme_zi()
+
+food_aov = aov(pellets ~ virus, data = h172h175_pellets[h172h175_pellets$food_restriction=="long",])
+summary(food_aov)
+
+wilcox.test(h172h175_pellets[h172h175_pellets$food_restriction=="long" & h172h175_pellets$virus=="GFP",]$pellets, h172h175_pellets[h172h175_pellets$food_restriction=="long" & h172h175_pellets$virus=="GI",]$pellets)
+
+
+```
+
+**Key Finding:** GI manipulation affects food consumption .
+
+---
+
+# 7. Stress and Motivation (GQ DREADD)
+
+```{r stress-gq-analysis}
+# Load stress GQ data
+stress_gq_pr <- read.csv("data/pr_stress_gq.csv")
+breakpoint_stress <- read.csv("data/breakpoint_stress_gq.csv")
+stress_gq_pr <- merge(stress_gq_pr, breakpoint_stress)
+stress_gq_pr$treatm <- factor(stress_gq_pr$treatm, levels = c("veh", "cno"))
+
+cno_group_comp <- list(
+  c("cont", "stress_gfp"),
+  c("cont", "stress_gq"),
+  c("stress_gfp", "stress_gq")
+)
+
+
+# Between-group comparison (CNO day, susceptible animals only)
+stress_gq_pr = stress_gq_pr[stress_gq_pr$animal %!in% c("S6.3", "S5.3"),]
+
+stress_ggplot = ggplot(
+    stress_gq_pr[stress_gq_pr$animal %!in% c("S6.3", "S5.3"),],
+    aes(x = group, y = breakingpoint)
+) +
+    geom_boxplot(aes(fill = group), alpha = 0.7, outlier.shape = NA) +
+    geom_jitter(aes(color = sex), width = 0.1, size = 2.5, alpha = 0.6) +
+    geom_line(aes(group = animal), alpha = 0.3) +
+    labs(
+        #title = "Stress Model: ZI Activation Rescues Motivation",
+        x = "Group",
+        y = "Breakpoint"
+    ) +
+    scale_fill_manual(
+        name = "Group",
+        values = c(
+            "cont" = COLORS$control,
+            "stress_gfp" = COLORS$stress,
+            "stress_gq" = COLORS$gq_dreadd
+        )
+    ) +
+    scale_color_manual(
+        name = "Sex",
+        values = c("male" = COLORS$male, "female" = COLORS$female)
+    ) +
+    stat_compare_means(
+        method = "wilcox.test",
+        paired = FALSE,
+        size = 7,
+        comparisons = cno_group_comp, label = "p.signif"
+    )+ facet_wrap(~treatm)+theme_zi()
+
+
+ggsave("/Users/laura/Desktop/GRADSCHOOL/DIAS/manuscripts_grants/ZI_MANUSCRIPT/FIGURES/R_gq_stress.pdf", plot = stress_ggplot, width = 11.5, 
+       height=5,  units = "in", device = cairo_pdf, dpi = 300)
+
+
+anova_stress = aov(breakingpoint ~ group*treatm*sex, data =  stress_gq_pr[stress_gq_pr$animal %!in% c("S6.3", "S5.3"),])
+summary(anova_stress)
+
+#mixed model for paper
+
+model_stress_pr <- lmer(breakingpoint ~ treatm * group * sex + (1 | animal), data =stress_gq_pr[stress_gq_pr$animal %!in% c("S6.3", "S5.3"),])
+anova(model_stress_pr)
+
+
+
+wilcox.test(stress_gq_pr[stress_gq_pr$animal %!in% c("S6.3", "S5.3") & stress_gq_pr$group =="cont" & stress_gq_pr$treatm=="veh",]$breakingpoint, stress_gq_pr[stress_gq_pr$animal %!in% c("S6.3", "S5.3") & stress_gq_pr$group =="stress_gfp" & stress_gq_pr$treatm=="veh",]$breakingpoint)
+
+cont <- stress_gq_pr[stress_gq_pr$group=="cont" & stress_gq_pr$treatm=="veh" ,]$breakingpoint
+
+stress_gq <- stress_gq_pr[stress_gq_pr$group=="stress_gq" & stress_gq_pr$treatm=="veh" ,]$breakingpoint
+
+stress_gfp <- stress_gq_pr[stress_gq_pr$group=="stress_gfp" & stress_gq_pr$treatm=="veh" ,]$breakingpoint
+
+cohen.d(cont, stress_gfp)
+
+###FR1 training 
+
+stress_meta = stress_gq_pr %>%
+    dplyr::distinct(animal, group, sex)
+
+stress_FR1_training = read.csv("data/stress_fr1_training.csv")
+
+stress_FR1_training = merge(stress_FR1_training, stress_meta)
+
+ggplot(stress_FR1_training,
+       aes(x = day, y = rewards, color = group)) +
+    # mean points per group
+    stat_summary(aes(group = group),
+                 fun = mean,
+                 geom = "point",
+                 size = 2) +
+    
+    # mean ± SE per group
+    stat_summary(aes(group = group),
+                 fun.data = mean_se,
+                 geom = "errorbar",
+                 width = 0.3) +
+    
+    # mean line per group
+    stat_summary(aes(group = group),
+                 fun = mean,
+                 geom = "line",
+                 size = 1.2) +
+    
+    labs(
+        title = "Training progress",
+        x = "Training day",
+        y = "Reinforcements"
+    ) +
+    theme_zi() +
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+    facet_wrap(~sex)+scale_color_manual(
+        name = "Group",
+        values = c(
+            "cont" = COLORS$control,
+            "stress_gfp" = COLORS$stress,
+            "stress_gq" = COLORS$gq_dreadd
+        )
+    )
+```
+
+**Key Finding:** Stress reduces motivation, and ZI activation can rescue this deficit.
+
+---
+
+
+## Statistical Summary Tables
+
+### 1. **Effect Size Calculations**
+```{r}
+# Calculate Cohen's d for main comparisons
+library(effsize)
+
+# For GI DREADD PR test
+gi_effect <- cohen.d(
+  breakingpoint ~ treatment,
+  data = pr_h80h90[pr_h80h90$group == "GI",]
+)
+gi_effect
+
+# For GQ DREADD PR test
+gq_effect <- cohen.d(
+  breakingpoint ~ treatment,
+  data = hcohorts_gq_pr[hcohorts_gq_pr$group == "hm3dgq",]
+)
+gq_effect
+```
+
+---
+
+### 2. **Learning Curve Analysis**
+
+```{r}
+# Analyze acquisition of operant behavior
+learning_curves <- all_opto_training_sum %>%
+  filter(excl == "incl") %>%
+  group_by(day, sex) %>%
+  summarise(
+    mean_press = mean(pressing_rate),
+    se_press = sd(pressing_rate) / sqrt(n())
+  )
+```
+---
+
+### 3. **Response Variability Analysis**
+
+```{r}
+# Calculate coefficient of variation (CV) for each group
+cv_analysis <- pr_h80h90 %>%
+  group_by(group, treatment) %>%
+  summarise(
+    mean_bp = mean(breakingpoint),
+    sd_bp = sd(breakingpoint),
+    cv = (sd_bp / mean_bp) * 100,
+    n = n())
+
+# Test for differences in variability (Levene's test)
+library(car)
+leveneTest(breakingpoint ~ group * treatment, data = pr_h80h90)
+```
+
+
+```{r} 
+#PIT Sound
+pit_sound_probe = read.csv("data/pit_sound_probe.csv")
+pit_sound_probe$block = factor(pit_sound_probe$block, levels = c("beginning", "sound1", "light1", "sound2", "light2"))
+pit_sound_probe$treatm = factor(pit_sound_probe$treatm, levels = c("veh", "cno"))
+pit_sound_probe$group = factor(pit_sound_probe$group, levels = c("gfp", "gi"))
+sex_colors <- c("male" = "#4292C6", "female" = "#E34A33")
+block_comp = list(
+  c("beginning", "sound1"),
+  c("sound1", "light1"),
+  c("beginning", "light1"), c("light1", "sound2"), c("sound1", "sound2"), c("light2", "sound2"), c("light1", "light2"))
+
+#removed not sign comp 
+block_comp = list(
+  c("beginning", "sound1"),
+  c("sound1", "light1"),
+  c("beginning", "light1"), c("light1", "sound2"), c("light2", "sound2"))
+
+
+
+ggplot(pit_sound_probe[pit_sound_probe$animal!="h189.3",], aes(x = block, y = rate)) +
+    # Add boxplot
+    geom_boxplot(aes(fill = block2), alpha = 0.5, width = 0.5) +
+    # Add individual points colored by sex
+    geom_jitter(aes(color = sex), width = 0.15, size = 2, alpha = 0.7) +
+    scale_fill_manual(values = c("#CCCCCC", "lightblue", "lightyellow", "lightblue", "lightyellow")) +
+    scale_color_manual(name = "Sex", values = c("male" = COLORS$male, "female" = COLORS$fem)) +
+    labs(title = "probe test after PIT. paired comparisons",
+         x = "Block",
+         y = "Pressing Rate") +
+    theme_classic() +
+    theme_zi()+facet_wrap(.~group*treatm)+stat_compare_means(
+        method = "wilcox.test",
+        label = "p.signif",
+        paired = TRUE,
+        size = 5, comparisons = block_comp)
+
+#CNO ONLY 
+
+ggplot(pit_sound_probe[pit_sound_probe$animal!="h189.3" & pit_sound_probe$treatm=="cno",], aes(x = block, y = rate)) +
+    # Add boxplot
+    geom_boxplot(aes(fill = block2), alpha = 0.5, width = 0.5) +
+    # Add individual points colored by sex
+    geom_jitter(aes(color = sex), width = 0.15, size = 1.7, alpha = 0.9) +
+    scale_fill_manual(values = c("#CCCCCC",  "lightyellow", "lightblue","lightyellow", "lightblue")) +
+    scale_color_manual(name = "Sex", values = c("male" = COLORS$male, "female" = COLORS$fem)) +
+    labs(title = "probe test after PIT. paired comparisons",
+         x = "Block",
+         y = "Pressing Rate") +
+    theme_classic() +
+    theme_zi()+facet_wrap(.~group)+stat_compare_means(
+        method = "wilcox.test",
+        label = "p.signif",
+        paired = TRUE,
+        size = 5, comparisons = block_comp)+stat_summary(aes(group = 1),         fun = mean, geom = "line",                     linewidth = 1.2,                              color = "black",                         alpha = 0.7  )  
+
+#sample size
+table(pit_sound_probe[pit_sound_probe$animal!="h189.3" & pit_sound_probe$treatm=="cno" & pit_sound_probe$block2=="beginning",]$group, pit_sound_probe[pit_sound_probe$animal!="h189.3" & pit_sound_probe$treatm=="cno" & pit_sound_probe$block2=="beginning",]$sex)
+
+
+##averaged across two light and two sounds 
+pit_sound_probe_av = pit_sound_probe[pit_sound_probe$animal!="h189.3",] %>%
+  dplyr::group_by(animal, sex, treatm,group, block2) %>%
+  dplyr::summarise(rate = mean(rate))
+
+block_comp_av = list(
+  c("beginning", "sound"),
+  c("beginning", "light"),
+  c("sound", "light"))
+
+pit_sound_probe_av$block2 = factor(pit_sound_probe_av$block2, levels = c("beginning", "sound","light"))
+
+ggplot(pit_sound_probe_av, aes(x = block2, y = rate)) +
+    # Add boxplot
+    geom_boxplot(aes(fill = block2), alpha = 0.5, width = 0.5) +
+    # Add individual points colored by sex
+    geom_jitter(aes(color = sex), width = 0.15, size = 2.5, alpha = 0.7) +
+    scale_fill_manual(values = c("#CCCCCC", "lightblue", "lightyellow")) +
+    scale_color_manual(values = sex_colors, name = "Sex") +
+    labs(title = "probe test after PIT. paired comparisons",
+         x = "Block",
+         y = "Pressing Rate") +
+    theme_classic() +
+    theme(
+        plot.title = element_text(size = 10, face = "bold", hjust = 0.5),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8),
+        legend.position = "right",
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 7),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+    ) +facet_wrap(.~group*treatm)+stat_compare_means(
+        method = "wilcox.test",
+        paired = TRUE,
+        size = 7, comparisons = block_comp_av)
+
+
+pit_anova = aov(rate ~ block*sex*group, data = pit_sound_probe[pit_sound_probe$treatm=="cno",])
+summary(pit_anova)
+
+library(lme4)
+  library(lmerTest)                                                             
+   
+  model <- lmer(rate ~ block * sex * group + (1 | animal),                     
+                data = pit_sound_probe[pit_sound_probe$treatm == "cno", ])
+  anova(model)
+
+pit_anova2 = aov(rate ~ block2*sex*treatm*group, data = pit_sound_probe_av)
+summary(pit_anova2)
+
+wilcox.test(pit_sound_probe_av[pit_sound_probe_av$block2=="sound" & pit_sound_probe_av$treatm=="cno" & pit_sound_probe_av$group=="gi",]$rate, pit_sound_probe_av[pit_sound_probe_av$block2=="beginning" & pit_sound_probe_av$treatm=="cno" & pit_sound_probe_av$group=="gi",]$rate )
+```
+
+
+---
+
+# Subjects Summary
+
+```{r subjects-summary}
+# Helper: counts unique subjects by sex and (optionally) by group
+summarize_exp <- function(df, id_col, sex_col = "sex", group_col = NULL) {
+  keep <- c(id_col, sex_col)
+  if (!is.null(group_col) && group_col %in% names(df)) keep <- c(keep, group_col)
+  d <- unique(df[, keep, drop = FALSE])
+  d <- d[!is.na(d[[sex_col]]) & d[[sex_col]] != "", ]
+  s <- tolower(substr(d[[sex_col]], 1, 1))
+  fem <- sum(s == "f"); mal <- sum(s == "m")
+  groups_str <- "—"; n_groups <- NA_integer_
+  if (!is.null(group_col) && group_col %in% names(d)) {
+    tab <- table(d[[group_col]])
+    tab <- tab[tab > 0]
+    n_groups <- length(tab)
+    groups_str <- paste(sprintf("%s (n=%d)", names(tab), as.integer(tab)),
+                        collapse = ", ")
+  }
+  list(female = fem, male = mal, n_groups = n_groups, groups = groups_str)
+}
+
+experiments <- list()
+
+# GI PR: pre-filtered at load; plots/stats use cohort %in% c("h90","h80")
+pr_gi_f <- pr_h80h90[pr_h80h90$cohort %in% c("h90", "h80"), ]
+experiments[["GI DREADD - Progressive Ratio"]] <-
+  summarize_exp(pr_gi_f, "Animal", group_col = "group")
+
+# GI Open Field: pre-filtered at load; plots/stats add excl!="excl" & Distance<15000
+of_raw <- open_field_h80h90[open_field_h80h90$excl != "excl" &
+                            open_field_h80h90$Distance < 15000, ]
+of <- merge(unique(of_raw[, "Animal", drop = FALSE]), meta, by = "Animal")
+experiments[["GI DREADD - Open Field"]] <- summarize_exp(of, "Animal", group_col = "group")
+
+# GI Memory: no additional filter
+experiments[["GI DREADD - Memory"]] <- summarize_exp(h90_memory, "Animal", group_col = "group")
+
+# GQ PR: no filter in primary plot
+experiments[["GQ DREADD - Progressive Ratio"]] <-
+  summarize_exp(hcohorts_gq_pr, "animal", group_col = "group")
+
+# GQ Probe: animal %!in% c("18.2","H112.2") & cort != "cort"
+gqp_raw <- h_gq_prob_test[h_gq_prob_test$animal %!in% c("18.2", "H112.2"), ]
+gqp <- merge(unique(gqp_raw[, "animal", drop = FALSE]), h_meta, by = "animal")
+gqp <- gqp[gqp$cort != "cort", ]
+experiments[["GQ DREADD - Probe Test"]] <- summarize_exp(gqp, "animal", group_col = "group")
+
+# Fiber photometry: no filter
+experiments[["Fiber Photometry - Reward Discrimination"]] <-
+  summarize_exp(light_reward_picked, "filename")
+
+# Opto PR: animal %!in% c("h56.2","h168.1") & freq == "20hz"
+opto_pr_f <- all_opto_pr[all_opto_pr$animal %!in% c("h56.2", "h168.1") &
+                         all_opto_pr$freq == "20hz", ]
+experiments[["Optogenetic - Progressive Ratio"]] <-
+  summarize_exp(opto_pr_f, "animal")
+
+# Opto Attention Training: excl == "incl"
+ot_f <- all_opto_training_sum[all_opto_training_sum$excl == "incl", ]
+experiments[["Optogenetic - Attention Training"]] <- summarize_exp(ot_f, "animal")
+
+# Opto IRT: incl == "incl"
+oi_f <- all_cohorts_irt_sum_filt2[all_cohorts_irt_sum_filt2$incl == "incl", ]
+experiments[["Optogenetic - IRT"]] <- summarize_exp(oi_f, "animal")
+
+# PIT Pellets Probe: food_restriction == "long"
+pitp <- h172h175_pellets[h172h175_pellets$food_restriction == "long", ]
+experiments[["PIT - Pellets Probe"]] <- summarize_exp(pitp, "animal", group_col = "group")
+
+# PIT Sound Probe: animal != "h189.3" & treatm == "cno"
+pit_sp_f <- pit_sound_probe[pit_sound_probe$animal != "h189.3" &
+                            pit_sound_probe$treatm == "cno", ]
+experiments[["PIT - Sound Probe"]] <-
+  summarize_exp(pit_sp_f, "animal", group_col = "group")
+
+# Stress GQ PR: animal %!in% c("S6.3","S5.3")
+stress_pr_f <- stress_gq_pr[stress_gq_pr$animal %!in% c("S6.3", "S5.3"), ]
+experiments[["Stress GQ DREADD - Progressive Ratio"]] <-
+  summarize_exp(stress_pr_f, "animal", group_col = "group")
+
+subj_summary <- do.call(rbind, lapply(names(experiments), function(nm) {
+  v <- experiments[[nm]]
+  data.frame(
+    Experiment = nm,
+    Female = v$female,
+    Male = v$male,
+    Total = v$female + v$male,
+    `# Groups` = v$n_groups,
+    Groups = v$groups,
+    check.names = FALSE
+  )
+}))
+
+write.csv(subj_summary, "data/subjects_summary.csv", row.names = FALSE)
+
+knitr::kable(
+  subj_summary,
+  caption = "Subject counts (female / male) and groups by experiment",
+  row.names = FALSE
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+```
